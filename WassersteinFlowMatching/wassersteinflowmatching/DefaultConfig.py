@@ -27,21 +27,21 @@ class DefaultConfig:
     :param kernel_init: (Callable) initializer of kernel weights (default nn.initializers.glorot_uniform())
     :param bias_init: ((Callable) initializer of bias weights (default nn.initializers.zeros_init())
     """ 
-    monge_map: str = 'entropic'
+    monge_map: str = 'row_iter'
     wasserstein_eps: float = 0.002
     wasserstein_lse: bool = True
     num_sinkhorn_iters: int = 200
     mini_batch_ot_mode: bool = True
     mini_batch_ot_solver: str = 'frechet'
-    minibatch_ot_eps: float = 0.1
-    minibatch_ot_lse: bool = False
-    noise_type: str = 'normal'
-    noise_df_scale: float = 1.0
-    scaling: str = 'min_max_total'
+    minibatch_ot_eps: float = 0.01
+    minibatch_ot_lse: bool = True
+    noise_type: str = 'chol_normal'
+    scaling: str = 'None'
+    noise_df_scale: float = 2
     factor: float = 1.0
     embedding_dim: int = 512
     num_layers: int = 6
     num_heads: int = 4
     dropout_rate: float = 0.1
-    mlp_hidden_dim: int = 1024
+    mlp_hidden_dim: int = 512
 
