@@ -1,43 +1,8 @@
 import ott # type: ignore
 from ott.solvers import linear # type: ignore
 import jax.numpy as jnp
-from jax import lax # type: 
 import jax 
 
-
-def argmax_row_iter(M):
-    """
-    Convert a soft assignment matrix M to a hard assignment vector
-    by iteratively finding the largest value in M and making assignments.
-
-    Args:
-        M (jnp.ndarray): A square soft assignment matrix.
-        
-    Returns:
-        jnp.ndarray: A vector of length N where the i-th element is the assignment index.
-    """
-    N = M.shape[0]
-    assignment = jnp.full(N, -1, dtype=jnp.int32)
-
-    def body_fun(_, val):
-        M, assignment = val
-        
-        # Find the global maximum
-        flat_idx = jnp.argmax(M)
-        i, j = jnp.unravel_index(flat_idx, M.shape)
-        
-        # Update assignment
-        assignment = assignment.at[i].set(j)
-        
-        # Set the corresponding row and column to -inf
-        M = M.at[i, :].set(-1)
-        M = M.at[:, j].set(-1)
-        
-        return M, assignment
-
-    _, assignment = lax.fori_loop(0, N, body_fun, (M, assignment))
-
-    return assignment
 
 def project_to_psd(matrix):
     """
@@ -194,5 +159,4 @@ def ot_mat_from_distance(distance_matrix, eps = 0.1, lse_mode = False):
         lse_mode = lse_mode,
         min_iterations = 200,
         max_iterations = 200)
-    map_ind = argmax_row_iter(ot_solve.matrix)
-    return(map_ind)
+    return(ot_solve.matrix)

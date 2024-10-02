@@ -1,4 +1,4 @@
-WassersteinWormhole
+Bures-Wasserstien Flow Matching
 ======================
 
-Flow Matching on point clouds with Wasserstein
+Flow Matching on Gaussians

@@ -47,7 +47,6 @@ class BuresWassersteinFlowMatching:
     ):
 
 
-        
         self.config = config
         self.point_clouds = point_clouds
 
@@ -59,8 +58,8 @@ class BuresWassersteinFlowMatching:
 
 
         self.noise_config = types.SimpleNamespace()
-        self.mini_batch_ot_mode = config.mini_batch_ot_mode
-
+        self.matched_noise = matched_noise
+        
         if(noise_means is None):
             self.noise_type = noise_type
             self.noise_func = getattr(utils_Noise, self.noise_type)
@@ -68,15 +67,10 @@ class BuresWassersteinFlowMatching:
             self.noise_config.mean_scale = jnp.std(self.means) * self.config.mean_scale_factor
             self.noise_config.cov_scale = jnp.diagonal(self.covariances, axis1 = 1, axis2 = 2).mean() * self.config.cov_scale_factor
             self.noise_config.degrees_of_freedom_scale = self.config.degrees_of_freedom_scale
-            self.matched_noise = False
         else:
             self.noise_func = utils_Noise.sampled_mean_and_cov
             self.noise_config.noise_means = noise_means
             self.noise_config.noise_covariances = noise_covariances
-            self.matched_noise = matched_noise
-            
-        if(self.matched_noise):
-            self.mini_batch_ot_mode = False
 
         
         self.space_dim = self.means.shape[-1]
@@ -90,8 +84,10 @@ class BuresWassersteinFlowMatching:
         self.gradient = self.config.gradient
 
         if(self.gradient == 'riemannian'):
+            print("Using riemannian gradient and updates")
             self.mccann_derivative_jit = jax.jit(jax.vmap(utils_OT.riemann_derivative, (0, 0, 0), 0))
         else:
+            print("Using Euclidean gradient and updates")
             self.mccann_derivative_jit = jax.jit(jax.vmap(utils_OT.mccann_derivative, (0, 0, 0), 0))
             self.psd_project_jit = jax.jit(jax.vmap(utils_OT.project_to_psd, 0, 0))
 
@@ -99,11 +95,13 @@ class BuresWassersteinFlowMatching:
         self.loss = self.config.loss
 
         if(self.loss == 'tangent'):
+            print("with tangent loss")
             self.loss_func = jax.jit(jax.vmap(utils_OT.tangent_norm, (0, 0, 0), 0))
         else:
+            print("with euclidean loss")
             self.loss_func = jax.jit(jax.vmap(utils_OT.euclidean_norm, (0, 0, 0), 0))
 
-        
+        self.mini_batch_ot_mode = config.mini_batch_ot_mode
 
 
         if(labels is not None):
@@ -151,7 +149,7 @@ class BuresWassersteinFlowMatching:
                                 deterministic = True)['params']
 
         lr_sched = optax.exponential_decay(
-            learning_rate, decay_steps, 0.97, staircase = False,
+            learning_rate, decay_steps, 0.97, staircase = True,
         )
 
         #lr_sched = learning_rate
@@ -177,8 +175,11 @@ class BuresWassersteinFlowMatching:
                                           [means_noise[matrix_ind[:, 1]], covariances_noise[matrix_ind[:, 1]]])
         ot_matrix =  ot_matrix.reshape(means_batch.shape[0], means_noise.shape[0])
 
+        pairing_matrix = utils_OT.ot_mat_from_distance(ot_matrix, self.minibatch_ot_eps, self.minibatch_ot_lse)
+        pairing_matrix = pairing_matrix/pairing_matrix.sum(axis = 1)
 
-        noise_ind = utils_OT.ot_mat_from_distance(ot_matrix, self.minibatch_ot_eps, self.minibatch_ot_lse)
+        subkey, key = random.split(key)
+        noise_ind = random.categorical(subkey, logits = jnp.log(pairing_matrix))
         return(noise_ind)
     
 
@@ -266,12 +267,6 @@ class BuresWassersteinFlowMatching:
                                              key = subkey)
 
 
-        if(batch_size>=self.means.shape[0]):
-            batch_size = self.means.shape[0]
-            replace = False
-        else:
-            replace = True
-
         tq = trange(training_steps, leave=True, desc="")
         self.losses = []
         for training_step in tq:
@@ -280,8 +275,7 @@ class BuresWassersteinFlowMatching:
             batch_ind = random.choice(
                 key=subkey,
                 a = self.means.shape[0],
-                shape=[batch_size],
-                replace=replace)
+                shape=[batch_size])
             
             means_batch, covariances_batch = self.means[batch_ind],  self.covariances[batch_ind]
 
@@ -373,7 +367,7 @@ class BuresWassersteinFlowMatching:
 
         dt = 1/timesteps
 
-        for t in tqdm(jnp.linspace(1, 0, timesteps)[:-1]):
+        for t in tqdm(jnp.linspace(1, 0, timesteps)):
             grad_fn = self.get_flow(generated_samples[-1][0], generated_samples[-1][1], t, generate_labels)
 
             mu_t = generated_samples[-1][0] + dt * grad_fn[0]
