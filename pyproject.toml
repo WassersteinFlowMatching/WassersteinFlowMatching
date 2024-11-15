@@ -2,7 +2,7 @@
 name = "wassersteinflowmatching"
 version = "0.1.0"
 description = "Flow Matching for point clouds"
-authors = ["Doron Haviv"]
+authors = ["Anon"]
 license = "MIT"
 readme = "README.md"
 
