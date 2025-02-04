@@ -1,4 +1,4 @@
-Wasserstien Flow Matching
+Wasserstein Flow Matching
 ======================
 
 Dear reviewer, we appreciate you for going over our code! 
